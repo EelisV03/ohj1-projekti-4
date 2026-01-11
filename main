@@ -1,1 +1,109 @@
+"""
+COMP.CS.100 Ohjelmointi 1 / Programming 1
+Murtolukulista 11.10
 
+Tekijä: Eelis Viskari
+Opiskelijanumero: xxxxxx
+"""
+import math
+
+class Fraction:
+    def __init__(self, numerator, denominator):
+        if denominator == 0:
+            raise ValueError("Denominator cannot be zero")
+
+        if denominator < 0:
+            numerator = -numerator
+            denominator = -denominator
+
+        self.__n = numerator
+        self.__d = denominator
+
+    def simplified(self):
+        g = math.gcd(self.__n, self.__d)
+        return Fraction(self.__n // g, self.__d // g)
+
+    def multiply(self, other):
+        return Fraction(self.__n * other.__n, self.__d * other.__d)
+
+    def __str__(self):
+        return f"{self.__n}/{self.__d}"
+
+
+def read_fractions_from_file(filename):
+    """
+    famkagkajgjakagjjggjgk
+    :param filename:
+    :return:
+    """
+    loaded = {}
+    with open(filename, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+            name, frac = line.split("=", 1)
+            n, d = map(int, frac.split("/", 1))
+            loaded[name.strip()] = Fraction(n, d)
+    return loaded
+
+
+def main():
+    fractions = {}
+
+    while True:
+        line = input("> ").strip()
+
+        if line == "quit":
+            print("Bye bye!")
+            break
+
+        elif line == "add":
+            frac_input = input("Enter a fraction in the form integer/integer: ").strip()
+            n, d = map(int, frac_input.split("/", 1))
+            name = input("Enter a name: ").strip()
+            fractions[name] = Fraction(n, d)
+
+        elif line == "print":
+            name = input("Enter a name: ").strip()
+            if name in fractions:
+                print(f"{name} = {fractions[name]}")
+            else:
+                print(f"Name {name} was not found")
+
+        elif line == "*":
+            first = input("1st operand: ").strip()
+            if first not in fractions:
+                print(f"Name {first} was not found")
+                continue
+
+            second = input("2nd operand: ").strip()
+            if second not in fractions:
+                print(f"Name {second} was not found")
+                continue
+
+            a = fractions[first]
+            b = fractions[second]
+            product = a.multiply(b)
+            print(f"{a} * {b} = {product}")
+            print(f"simplified {product.simplified()}")
+
+        elif line == "file":
+            filename = input("Enter the name of the file: ").strip()
+            try:
+                fractions.update(read_fractions_from_file(filename))
+            except (OSError, ValueError):
+                # OSError: tiedostoa ei saa auki/luettua
+                # ValueError: virheellinen rivi tai int-muunnos tai 0-nimittäjä tms.
+                print("Error: the file cannot be read.")
+
+        elif line == "list":
+            for name in sorted(fractions):
+                print(f"{name} = {fractions[name]}")
+
+        else:
+            print("Unknown command!")
+
+
+if __name__ == "__main__":
+    main()
