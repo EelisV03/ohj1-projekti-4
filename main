@@ -1,109 +1,460 @@
 """
 COMP.CS.100 Ohjelmointi 1 / Programming 1
-Murtolukulista 11.10
 
-Tekijä: Eelis Viskari
-Opiskelijanumero: xxxxxx
+
+Tämä ohjelma lukee tuotetiedot tiedostosta ja tarjoaa komentopohjaisen
+käyttöliittymän tuotteiden tarkasteluun ja hallintaan.
+
+Käyttäjä voi tulostaa tuotteita, muuttaa varastosaldoja, yhdistää tuotteita,
+asettaa alennuksia sekä poistaa tuotteita varastosta sääntöjen mukaisesti.
+
+Ohjelma loppuu, kun käyttäjä syöttää tyhjän syötön.
+
+
+StudentId: 152028312
+Name:      Eelis Viskari
+Email:     eelis.viskari@tuni.fi
 """
-import math
 
-class Fraction:
-    def __init__(self, numerator, denominator):
-        if denominator == 0:
-            raise ValueError("Denominator cannot be zero")
+# +--------------------------------------------------------------+
+# | This template file requires at minimum Python version 3.8 to |
+# | work correctly. If your Python version is older, you really  |
+# | should get yourself a newer version.                         |
+# +--------------------------------------------------------------+
 
-        if denominator < 0:
-            numerator = -numerator
-            denominator = -denominator
 
-        self.__n = numerator
-        self.__d = denominator
+LOW_STOCK_LIMIT = 30
 
-    def simplified(self):
-        g = math.gcd(self.__n, self.__d)
-        return Fraction(self.__n // g, self.__d // g)
 
-    def multiply(self, other):
-        return Fraction(self.__n * other.__n, self.__d * other.__d)
+class Product:
+    """
+    This class represent a product i.e. an item available for sale.
+    """
+
+    def __init__(self, code, name, category, price, stock):
+        """
+        Säilyttää annetut tiedot ja mahdollistaa näiden muokkaamisen.
+
+        :param code: Koodi, jolla löytää tuotteen
+        :param name: Tuotteen nimi
+        :param category: Tuotteen kategoria
+        :param price: Tuotteen hinta
+        :param stock: Paljonko tuotetta varastossa
+        """
+        self.__code = code
+        self.__name = name
+        self.__category = category
+        self.__price = price
+        self.__stock = stock
+        # Toimii kirjastona, jossa avain on koodi ja arvo alkuperäinen hinta
+        # Tallettaa vanhat alkuperäisen hinnan, jotta alennuksia voidaan suorittaa
+        self.__original_price = {}
+
+    def get_code(self):
+        """
+        Antaa koodin tarvittaessa.
+
+        :return: Palauttaa tuotteen yksilöllisen koodin
+        """
+        return self.__code
+
+    def get_category(self):
+        """
+        Antaa tuotteen kategorian tarvittaessa
+
+        :return: Palauttaa tuotteen kategorian
+        """
+        return self.__category
+
+    def get_stock(self):
+        """
+        Antaa tuotteen kategorian tarvittaessa
+
+        :return: Palauttaa tuotteen kategorian
+        """
+        return self.__stock
+
+    def get_price(self):
+        """
+        Antaa tuotteen hinnan tarvittaessa
+
+        :return: Palauttaa tuotteen hinnan
+        """
+        return self.__price
+
+    def set_sale_price(self, code, original_price, sale_price):
+        """
+        Ottaa huomioon mahdollisen alennuksen ja asettaa alennetun hinnan tuotteille.
+
+        :param code: Tuotteen koodi
+        :param original_price: Tuotteen alkuperäinen hinta
+        :param sale_price: Alennus prosentti
+        :return:
+        """
+
+        # Tallentaa tuotteen alkuperäisen hinnan muistiin yhdistäen tämän tuotteen koodiin.
+        if code not in self.__original_price:
+            self.__original_price[code] = original_price
+
+        # Laskee uuden hinnan tuotteelle huomioiden alennuksen.
+        new_price = self.__original_price[code]*((100-sale_price)/100)
+        self.__price = new_price
 
     def __str__(self):
-        return f"{self.__n}/{self.__d}"
+        """
+        YOU SHOULD NOT MODIFY THIS METHOD or it will mess up
+        the automated tests.
+        """
 
+        lines = [
+            f"Code:     {self.__code}",
+            f"Name:     {self.__name}",
+            f"Category: {self.__category}",
+            f"Price:    {self.__price:.2f}€",
+            f"Stock:    {self.__stock} units",
+        ]
 
-def read_fractions_from_file(filename):
+        longest_line = len(max(lines, key=len))
+
+        for i in range(len(lines)):
+            lines[i] = f"| {lines[i]:{longest_line}} |"
+
+        solid_line = "+" + "-" * (longest_line + 2) + "+"
+        lines.insert(0, solid_line)
+        lines.append(solid_line)
+
+        return "\n".join(lines)
+
+    def __eq__(self, other):
+        """
+        YOU SHOULD NOT MODIFY THIS METHOD or it will mess up
+        the automated tests since the read_database function will
+        stop working correctly.
+        """
+
+        return self.__code == other.__code and \
+               self.__name == other.__name and \
+               self.__category == other.__category and \
+               self.__price == other.__price
+
+    def modify_stock_size(self, amount):
+        """
+        YOU SHOULD NOT MODIFY THIS METHOD since read_database
+        relies on its behavior and might stop working as a result.
+
+        Allows the <amount> of items in stock to be modified.
+        This is a very simple method: it does not check the
+        value of <amount> which could possibly lead to
+        a negative amount of items in stock. Caveat emptor.
+
+        :param amount: int, how much to change the amount in stock.
+                       Both positive and negative values are accepted:
+                       positive value increases the stock and vice versa.
+        """
+
+        self.__stock += amount
+
+def _read_lines_until(fd, last_line):
     """
-    famkagkajgjakagjjggjgk
-    :param filename:
-    :return:
+    YOU SHOULD NOT MODIFY THIS FUNCTION since read_database
+    relies on its behavior and might stop working as a result.
+
+    Reads lines from <fd> until the <last_line> is found.
+    Returns a list of all the lines before the <last_line>
+    which is not included in the list. Return None if
+    file ends bofore <last_line> is found.
+    Skips empty lines and comments (i.e. characeter '#'
+    and everything after it on a line).
+
+    You don't need to understand this function works as it is
+    only used as a helper function for the read_database function.
+
+    :param fd: file, file descriptor the input is read from.
+    :param last_line: str, reads lines until <last_line> is found.
+    :return: list[str] | None
     """
-    loaded = {}
-    with open(filename, "r", encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line:
-                continue
-            name, frac = line.split("=", 1)
-            n, d = map(int, frac.split("/", 1))
-            loaded[name.strip()] = Fraction(n, d)
-    return loaded
 
-
-def main():
-    fractions = {}
+    lines = []
 
     while True:
-        line = input("> ").strip()
+        line = fd.readline()
 
-        if line == "quit":
-            print("Bye bye!")
-            break
+        if line == "":
+            return None
 
-        elif line == "add":
-            frac_input = input("Enter a fraction in the form integer/integer: ").strip()
-            n, d = map(int, frac_input.split("/", 1))
-            name = input("Enter a name: ").strip()
-            fractions[name] = Fraction(n, d)
+        hashtag_position = line.find("#")
+        if hashtag_position != -1:
+            line = line[:hashtag_position]
 
-        elif line == "print":
-            name = input("Enter a name: ").strip()
-            if name in fractions:
-                print(f"{name} = {fractions[name]}")
-            else:
-                print(f"Name {name} was not found")
+        line = line.strip()
 
-        elif line == "*":
-            first = input("1st operand: ").strip()
-            if first not in fractions:
-                print(f"Name {first} was not found")
-                continue
+        if line == "":
+            continue
 
-            second = input("2nd operand: ").strip()
-            if second not in fractions:
-                print(f"Name {second} was not found")
-                continue
-
-            a = fractions[first]
-            b = fractions[second]
-            product = a.multiply(b)
-            print(f"{a} * {b} = {product}")
-            print(f"simplified {product.simplified()}")
-
-        elif line == "file":
-            filename = input("Enter the name of the file: ").strip()
-            try:
-                fractions.update(read_fractions_from_file(filename))
-            except (OSError, ValueError):
-                # OSError: tiedostoa ei saa auki/luettua
-                # ValueError: virheellinen rivi tai int-muunnos tai 0-nimittäjä tms.
-                print("Error: the file cannot be read.")
-
-        elif line == "list":
-            for name in sorted(fractions):
-                print(f"{name} = {fractions[name]}")
+        elif line == last_line:
+            return lines
 
         else:
-            print("Unknown command!")
+            lines.append(line)
 
+
+def read_database(filename):
+    """
+    YOU SHOULD NOT MODIFY THIS FUNCTION as it is ready.
+
+    This function reads an input file which must be in the format
+    explained in the assignment. Returns a dict containing
+    the product code as the key and the corresponding Product
+    object as the payload. If an error happens, the return value will be None.
+
+    You don't necessarily need to understand how this function
+    works as long as you understand what the return value is.
+    You can probably learn something new though, if you examine the
+    implementation.
+
+    :param filename: str, name of the file to be read.
+    :return: dict[int, Product] | None
+    """
+
+    data = {}
+
+    try:
+        with open(filename, mode="r", encoding="utf-8") as fd:
+
+            while True:
+                lines = _read_lines_until(fd, "BEGIN PRODUCT")
+                if lines is None:
+                    return data
+
+                lines = _read_lines_until(fd, "END PRODUCT")
+                if lines is None:
+                    print(f"Error: premature end of file while reading '{filename}'.")
+                    return None
+
+                # print(f"TEST: {lines=}")
+
+                collected_product_info = {}
+
+                for line in lines:
+                    keyword, value = line.split(maxsplit=1)  # ValueError possible
+
+                    # print(f"TEST: {keyword=} {value=}")
+
+                    if keyword in ("CODE", "STOCK"):
+                        value = int(value)  # ValueError possible
+
+                    elif keyword in ("NAME", "CATEGORY"):
+                        pass  # No conversion is required for string values.
+
+                    elif keyword == "PRICE":
+                        value = float(value)  # ValueError possible
+
+                    else:
+                        print(f"Error: an unknown data identifier '{keyword}'.")
+                        return None
+
+                    collected_product_info[keyword] = value
+
+                if len(collected_product_info) < 5:
+                    print(f"Error: a product block is missing one or more data lines.")
+                    return None
+
+                product_code = collected_product_info["CODE"]
+                product_name = collected_product_info["NAME"]
+                product_category = collected_product_info["CATEGORY"]
+                product_price = collected_product_info["PRICE"]
+                product_stock = collected_product_info["STOCK"]
+
+                product = Product(code=product_code,
+                                  name=product_name,
+                                  category=product_category,
+                                  price=product_price,
+                                  stock=product_stock)
+
+                # print(product)
+
+                if product_code in data:
+                    if product == data[product_code]:
+                        data[product_code].modify_stock_size(product_stock)
+
+                    else:
+                        print(f"Error: product code '{product_code}' conflicting data.")
+                        return None
+
+                else:
+                    data[product_code] = product
+
+    except OSError:
+        print(f"Error: opening the file '{filename}' failed.")
+        return None
+
+    except ValueError:
+        print(f"Error: something wrong on line '{line}'.")
+        return None
+
+def main():
+    filename = input("Enter database name: ")
+    # filename = "products.txt"
+
+    warehouse = read_database(filename)
+    if warehouse is None:
+        return
+
+    while True:
+        command_line = input("Enter command: ").strip()
+
+        # Lopettaa ohjelman
+        if command_line == "":
+            return
+
+        command, *parameters = command_line.split(maxsplit=1)
+
+        command = command.lower()
+
+        if len(parameters) == 0:
+            parameters = ""
+        else:
+            parameters = parameters[0]
+
+        # Tulostaa kaikki ohjelman sisältämät tuotteet aakkosjärjestyksessä
+        if "print".startswith(command) and parameters == "":
+            # Käy lävitse jokaisen tuotteen
+            for code in sorted(warehouse):
+                print(warehouse[code])
+
+        # Tulostaa tietyn tuotteen tiedot ohjelmasta
+        elif "print".startswith(command) and parameters != "":
+
+            # Selvittää onko koodi oikeassa muodossa
+            try:
+                code = int(parameters)
+            except ValueError:
+                print(f"Error: product '{parameters}' can not be printed as it does not exist.")
+                continue
+
+            # Selvittää onko koodi ohjelmassa
+            if code not in warehouse:
+                print(f"Error: product '{code}' can not be printed as it does not exist.")
+            else:
+                print(warehouse[code])
+
+
+        # Komennolla poistetaan tuotteita
+        elif "delete".startswith(command) and parameters != "":
+
+            # Selvittää onko koodi oikeassa muodossa
+            try:
+                code = int(parameters)
+            except ValueError:
+                print(f"Error: product '{parameters}' can not be deleted as it does not exist.")
+                continue
+
+            # Selvittää onko koodi ohjelmassa
+            if code not in warehouse:
+                print(f"Error: product '{parameters}' can not be deleted as it does not exist.")
+                continue
+
+            if warehouse[code].get_stock() > 0:
+                print(f"Error: product '{code}' can not be deleted as stock remains.")
+                continue
+
+            del warehouse[code]
+
+        # Lisää tai vähentää tuotteen määrä varastossa
+        elif "change".startswith(command) and parameters != "":
+
+            # Selvittää onko annetut arvot oikeassa muodossa
+            try:
+                code_p, stock_p = parameters.split()
+                code = int(code_p)
+                amount = int(stock_p)
+            except ValueError:
+                print(f"Error: bad parameters '{parameters}' for change command.")
+                continue
+
+            # Selvittää onko tuote ohjelmassa
+            if code not in warehouse:
+                print(f"Error: stock for '{code}' can not be changed as it does not exist.")
+                continue
+
+            # Muokkaa tuotteen varaston määrää
+            warehouse[code].modify_stock_size(amount)
+
+        # Tulostaa kaikki tuotteet, jotka ovat vähissä.
+        elif "low".startswith(command) and parameters == "":
+            for code in sorted(warehouse):
+                if warehouse[code].get_stock() < LOW_STOCK_LIMIT:
+                    print(warehouse[code])
+
+        # Yhdistää kaksi samanlaista tuotetta yhden koodin alle tietyin ehdoin.
+        elif "combine".startswith(command) and parameters != "":
+
+            parts = parameters.split()
+
+            # Tarkistetaan, että komentoriveja ei ole ylimääräisiä.
+            if len(parts) != 2:
+                print(f"Error: bad command line 'combine {parameters}'")
+                continue
+
+            code1, code2 = parts
+
+            # Tarkistetaan, että molemmat komennot ovat kokonaislukuja
+            try:
+                code_1 = int(code1)
+                code_2 = int(code2)
+
+            except ValueError:
+                print(f"Error: bad parameters '{parameters}' for combine command.")
+                continue
+
+            # Tarkistetaan, että koodit ovat eri ja koodit molemmat löytyvät valikoimasta
+            if code_1 == code_2 or code_1 not in warehouse or code_2 not in warehouse:
+                print(f"Error: bad parameters '{parameters}' for combine command.")
+                continue
+            # Tarkistetaan, että hinta on sama molemmissa tuotteissa
+            if warehouse[code_1].get_price() != warehouse[code_2].get_price():
+                print(f"Error: combining items with different prices "
+                      f"{warehouse[code_1].get_price():.2f}€ and {warehouse[code_2].get_price():.2f}€.")
+                continue
+
+            # Tarkistetaan, että molemmat tuotteet ovat samaa kategoriaa
+            if warehouse[code_1].get_category() != warehouse[code_2].get_category():
+                print(f"Error: combining items of different categories '{warehouse[code_1].get_category()}' and '{warehouse[code_2].get_category()}'.")
+                continue
+
+            # Siirretään koodin 2 tuotemäärä koodin 1 alle ja poistetaan koodi 2 järjestelmästä
+            warehouse[code_1].modify_stock_size(warehouse[code_2].get_stock())
+            del warehouse[code_2]
+
+        # Muokkaa tietylle kategorialle alennetut hinnat syöttäjän käskystä.
+        elif "sale".startswith(command) and parameters != "":
+            # Jakaa käyttäjän komennot kahteen osaan.
+            category, sale = parameters.split()
+
+            # Tarkistaa, että alennus on annettu oikeassa muodossa.
+            try:
+                sale_price = float(sale)
+            except ValueError:
+                print(f"Error: bad parameters '{parameters}' for sale command.")
+                continue
+
+            # Käy lävitse kaikki koodit, jotka kuuluvat käyttäjän mainitsemaan kategoriaan.
+            count = 0
+            for code in warehouse:
+
+                # Jos tuote ei kuulu kategoriaan
+                if warehouse[code].get_category() != category:
+                    continue
+
+                # Jos tuote kuuluu oikeaan kategoriaan
+                else:
+                    count += 1
+                    # Muokkaa tuotteen hinnan ottaen huomioon alennuksen.
+                    warehouse[code].set_sale_price(code, warehouse[code].get_price(), sale_price)
+            print(f"Sale price set for {count} items.")
+        else:
+            print(f"Error: bad command line '{command_line}'.")
+            continue
 
 if __name__ == "__main__":
     main()
